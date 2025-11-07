@@ -82,6 +82,7 @@ export const connectToSocket = (server) => {
                 // Clean up empty rooms
                 if (connections[roomId].length === 0) {
                     delete connections[roomId];
+                    delete messages[roomId];
                 }
             }
 
