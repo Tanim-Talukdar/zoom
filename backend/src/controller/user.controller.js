@@ -4,7 +4,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { loginSchema, registerSchema } from "../utils/validationSchema.js";
 import dotenv from "dotenv";
-
+dotenv.config();
 const JwtSecret = process.env.JWT_SECRET;
 
 export const generateToken = (user) => {
