@@ -13,7 +13,7 @@ export default function VideoMeet() {
 
   const socketRef = useRef();
   const roomId = window.location.href;
-  const serverUrl = "http://localhost:8000/";
+  const serverUrl = "https://zoom-58ot.onrender.com/";
   const navigate = useNavigate()
 
   const connect = () => {
