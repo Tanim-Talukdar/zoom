@@ -4,7 +4,7 @@ import LandingPage from './pages/LandingPage';
 import Animation from './pages/Animation';
 import Auth from './pages/Auth';
 import { AuthProvider } from './contexts/AuthContext'; 
-import VideoMeet from './pages/videoMeet';
+import VideoMeet from './pages/VideoMeet';
 
 function App() {
   return (
