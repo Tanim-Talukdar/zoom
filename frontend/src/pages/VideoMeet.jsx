@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { io } from "socket.io-client";
 import TextField from "@mui/material/TextField";
 import { Button, Box, Typography, Paper, Stack } from "@mui/material";
@@ -10,11 +10,51 @@ export default function VideoMeet() {
   const [users, setUsers] = useState([]);
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState("");
+  const [stream, setStream] = useState(null);
+  const peers = useRef({}); // Store all user peer connections
 
+  const videoRef = useRef(null);
   const socketRef = useRef();
   const roomId = window.location.href;
-  const serverUrl = "https://zoom-58ot.onrender.com/";
-  const navigate = useNavigate()
+  const serverUrl = "http://localhost:8000/";
+  const navigate = useNavigate();
+
+  var connections = {};
+
+  const peerConfigConnections = {
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  };
+
+  // ✅ Take permission & show preview
+  useEffect(() => {
+const getMedia = async () => {
+  try {
+    const userStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true,
+    });
+    setStream(userStream);
+    if (videoRef.current) {
+      videoRef.current.srcObject = userStream;
+    }
+  } catch (err) {
+    console.error("Media error:", err);
+
+    // Allow joining even without media
+    if (err.name === "NotAllowedError") {
+      alert("You denied camera/microphone access. Joining without video/audio.");
+    } else if (err.name === "NotFoundError") {
+      alert("No camera or microphone found. Joining without video/audio.");
+    } else {
+      alert("Could not access media devices. Joining without video/audio.");
+    }
+
+    // Continue joining logic (without stream)
+    setStream(null); // or handle no-media join
+  }
+};
+    getMedia();
+  }, []);
 
   const connect = () => {
     if (!username) return alert("Enter name first");
@@ -27,8 +67,46 @@ export default function VideoMeet() {
 
       socketRef.current.emit("join-call", roomId);
 
-      socketRef.current.on("user-joined", (newUserId, clients) => {
+      socketRef.current.on("user-joined", async (newUserId, clients) => {
         setUsers(clients);
+        if (stream) {
+          const peer = new RTCPeerConnection(peerConfigConnections);
+
+          // Send your video/audio tracks
+          stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+
+          // When you get remote video
+          peer.ontrack = (event) => {
+            const remoteVideo = document.createElement("video");
+            remoteVideo.srcObject = event.streams[0];
+            remoteVideo.autoplay = true;
+            remoteVideo.playsInline = true;
+            remoteVideo.style.width = "200px";
+            document.body.appendChild(remoteVideo);
+          };
+
+          // ICE candidate sending
+          peer.onicecandidate = (event) => {
+            if (event.candidate) {
+              socketRef.current.emit("ice-candidate", {
+                target: newUserId,
+                candidate: event.candidate,
+              });
+            }
+          };
+
+          // Create an offer and send it
+          const offer = await peer.createOffer();
+          await peer.setLocalDescription(offer);
+
+          socketRef.current.emit("offer", {
+            target: newUserId,
+            caller: socketRef.current.id,
+            sdp: peer.localDescription,
+          });
+
+          peers.current[newUserId] = peer;
+        }
       });
 
       socketRef.current.on("chat-message", (message, sender, socketId) => {
@@ -47,7 +125,7 @@ export default function VideoMeet() {
   const disconnect = () => {
     if (socketRef.current) {
       socketRef.current.disconnect();
-      navigate("/")
+      navigate("/");
     }
   };
 
@@ -58,6 +136,21 @@ export default function VideoMeet() {
           <Typography variant="h5" gutterBottom>
             Enter into Lobby
           </Typography>
+
+          {/* ✅ Local video preview before connect */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{
+              width: "100%",
+              borderRadius: "10px",
+              backgroundColor: "#000",
+              marginBottom: "1rem",
+            }}
+          ></video>
+
           <TextField
             fullWidth
             label="Username"
